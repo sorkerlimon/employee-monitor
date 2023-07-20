@@ -15,6 +15,13 @@ from PyQt5.QtGui import QTextCharFormat, QColor
 from pytz import timezone
 import mysql.connector
 from mysql.connector import Error
+import os
+import ctypes
+import sys
+
+
+
+
 
 class LoginDialog(QDialog):
     def __init__(self, parent=None):
@@ -34,6 +41,7 @@ class LoginDialog(QDialog):
 
         self.login_button = QPushButton('Login', self)
         self.login_button.clicked.connect(self.login_button_clicked)
+        self.login_button.setStyleSheet("background-color: rgb(194, 68, 68); color: white; font-weight: bold;")
 
         vbox = QVBoxLayout()
         vbox.addWidget(self.username_label)
@@ -65,6 +73,7 @@ class LoginDialog(QDialog):
                 # Connect to the database
         try:
             cnx = mysql.connector.connect(
+                # host='203.76.112.52',
                 host='192.168.100.25',
                 port=3306,  # Specify the port number here
                 user='iimi',
@@ -175,6 +184,35 @@ class MyApp(QWidget):
         else:
             sys.exit()
 
+    @staticmethod
+    def is_admin():
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+
+    @staticmethod
+    def block_website(website):
+        hosts_path = r"C:\Windows\System32\drivers\etc\hosts"  # Change this path for non-Windows systems
+        localhost_ip = "127.0.0.1"
+
+        try:
+            with open(hosts_path, "r+") as file:
+                content = file.read()
+                if website not in content:
+                    file.write(f"\n{localhost_ip} {website}")
+                    print(f"{website} has been blocked.")
+                else:
+                    print(f"{website} is already blocked.")
+        except PermissionError:
+            if MyApp.is_admin():
+                print("Permission error: Failed to block website.")
+            else:
+                # Re-run the script with administrator privileges
+                script = os.path.abspath(__file__)
+                ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, script, None, 1)
+            sys.exit(0)
+
     def start_button_clicked(self):
         self.start_button.hide()
         self.close_button.show()
@@ -196,6 +234,11 @@ class MyApp(QWidget):
                 print(browser)
         else:
             print("No browsers currently open.")
+
+        websites_to_block = ["facebook.com", "youtube.com", "example.com", "hello.com"]  # Add more websites to block here
+        for website in websites_to_block:
+            MyApp.block_website(website)
+            
 
 
     def update_time(self):
@@ -240,6 +283,35 @@ class MyApp(QWidget):
         print("Local IP address:", self.local_ip_address)
         print("Public IP address:", self.public_ip_address)
         print("Physical address:", self.physical_address)
+
+    # def is_admin():
+    #     try:
+    #         return ctypes.windll.shell32.IsUserAnAdmin()
+    #     except:
+    #         return False
+    @staticmethod
+    def unblock_website(website):
+        hosts_path = r"C:\Windows\System32\drivers\etc\hosts"  # Change this path for non-Windows systems
+        localhost_ip = "127.0.0.1"
+
+        try:
+            with open(hosts_path, "r+") as file:
+                lines = file.readlines()
+                file.seek(0)
+                for line in lines:
+                    if not (line.strip().endswith(website) or line.strip().endswith(f"{localhost_ip} {website}")):
+                        file.write(line)
+                file.truncate()
+                print(f"{website} has been unblocked.")
+        except PermissionError:
+            if MyApp.is_admin():
+                print("Permission error: Failed to unblock website.")
+            else:
+                # Re-run the script with administrator privileges
+                script = os.path.abspath(__file__)
+                ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, script, None, 1)
+            sys.exit(0)
+
         
     def close_button_clicked(self):
         self.close_button.hide()
@@ -264,7 +336,7 @@ class MyApp(QWidget):
 
         print("Close button clicked at", self.close_time)
         working_time = self.calculate_time_difference()
-        self.save_data_to_database(self.login_dialog.user_id,working_time)
+        # self.save_data_to_database(self.login_dialog.user_id,working_time)
 
 
         chrome = Chrome()
@@ -301,10 +373,16 @@ class MyApp(QWidget):
         for domain, count in domain_counts.items():
             percentage = (count / total_count) * 100
             print(f"{domain} Percentage: {percentage:.2f}%")
+        
+        websites_to_block = ["facebook.com", "youtube.com", "example.com", "hello.com"]  # Add more websites to block here
+        for website in websites_to_block:
+            MyApp.unblock_website(website)
+        
+        self.save_data_to_database(self.login_dialog.user_id,working_time,domain_counts)
 
 
 
-    def save_data_to_database(self, user_id, working_time):
+    def save_data_to_database(self, user_id, working_time, domain_counts):
         local_ip_address = self.local_ip_address
         public_ip_address = self.public_ip_address
         physical_address = self.physical_address
@@ -312,35 +390,43 @@ class MyApp(QWidget):
         close_time = self.stop_time.strftime("%Y-%m-%d %I:%M:%S %p")
 
         try:
-            # Connect to the database
             self.db = mysql.connector.connect(
+                # host='203.76.112.52',
                 host='192.168.100.25',
                 port=3306,
                 user='iimi',
                 password='limon@123',
                 database='workflow'
             )
-
-            # Create a cursor object
             self.cursor = self.db.cursor()
 
-            # # Execute the SQL query
-
+            # Insert basic information into the ip_time table
             sql = "INSERT INTO ip_time (user_id, local_ip_address, public_ip_address, physical_address, start_time, close_time, working_time) VALUES (%s, %s, %s, %s, %s, %s, %s)"
             values = (user_id, local_ip_address, public_ip_address, physical_address, start_time, close_time, working_time)
-    
             self.cursor.execute(sql, values)
+
+            # Get the last inserted row's ID
+            last_row_id = self.cursor.lastrowid
+
+            # Prepare domain data for insertion
+            total_count = sum(domain_counts.values())
+            domain_data = []
+            for domain, count in domain_counts.items():
+                percentage = (count / total_count) * 100
+                domain_data.append((last_row_id, user_id, domain, percentage))
+
+            # Insert domain data into the dynamic_data table
+            domain_sql = "INSERT INTO dynamic_data (ip_time_id, user_id, domain, percentage) VALUES (%s, %s, %s, %s)"
+            self.cursor.executemany(domain_sql, domain_data)
 
             # Commit the changes to the database
             self.db.commit()
-
             print("Data saved to the database.")
 
         except mysql.connector.Error as err:
             QMessageBox.critical(self, 'Database Error', f"Failed to save data to the database: {err}")
 
         finally:
-            # Close the cursor and database connection
             if self.cursor:
                 self.cursor.close()
             if self.db:
@@ -380,3 +466,4 @@ if __name__ == '__main__':
 
     #pyinstaller --onefile --noconsole
     #pyinstaller --onefile --icon=icon.ico
+    #pyinstaller --onefile --noconsole -i "icon.ico" app.py

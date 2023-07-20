@@ -60,3 +60,48 @@ login(username, password)
 #   close_time VARCHAR(50),
 #   FOREIGN KEY (user_id) REFERENCES users(id)
 # );
+
+# CREATE TABLE dynamic_data (
+#   id INT AUTO_INCREMENT PRIMARY KEY,
+#   ip_time_id INT,
+#   user_id INT,
+#   domain VARCHAR(255),
+#   percentage DECIMAL(5,2),
+#   FOREIGN KEY (ip_time_id) REFERENCES ip_time(id),
+#   FOREIGN KEY (user_id) REFERENCES users(id)
+# );
+
+# INSERT INTO users (username, password) VALUES ('limon', 'limon@123');
+
+# Last db design
+
+# CREATE TABLE users (
+#   id INT AUTO_INCREMENT PRIMARY KEY,
+#   username VARCHAR(255) NOT NULL,
+#   password VARCHAR(255) NOT NULL,
+#   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+# );
+
+# CREATE TABLE ip_time (
+#   id INT AUTO_INCREMENT PRIMARY KEY,
+#   user_id INT,
+#   local_ip_address VARCHAR(255),
+#   public_ip_address VARCHAR(255),
+#   physical_address VARCHAR(255),
+#   start_time VARCHAR(50),
+#   close_time VARCHAR(50),
+#   working_time VARCHAR(250),
+#   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#   FOREIGN KEY (user_id) REFERENCES users(id)
+# );
+
+# CREATE TABLE dynamic_data (
+#   id INT AUTO_INCREMENT PRIMARY KEY,
+#   ip_time_id INT,
+#   user_id INT,
+#   domain VARCHAR(255),
+#   percentage DECIMAL(5,2),
+#   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#   FOREIGN KEY (ip_time_id) REFERENCES ip_time(id),
+#   FOREIGN KEY (user_id) REFERENCES users(id)
+# );
